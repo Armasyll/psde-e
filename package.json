@@ -1,0 +1,24 @@
+{
+  "name": "PSDEe",
+  "version": "1.0.0",
+  "description": "Electron wrapper for PSDE",
+  "main": "index.js",
+  "keywords": [],
+  "author": "armasyll@gmail.com",
+  "license": "GPL",
+  "devDependencies": {
+    "electron": "^11.3.0",
+    "extract-zip": "^1.7.0",
+    "follow-redirects": "^1.13.3",
+    "fs-extra": "^8.1.0"
+  },
+  "dependencies": {
+    "electron": "^11.3.0",
+    "extract-zip": "^1.7.0",
+    "follow-redirects": "^1.13.3",
+    "fs-extra": "^8.1.0"
+  },
+  "scripts": {
+    "start": "electron ."
+  }
+}
