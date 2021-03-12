@@ -1,11 +1,14 @@
+const path = require('path');
 const Tools = require('./Tools.js');
 const { app, BrowserWindow } = require('electron');
 const extract = require('extract-zip');
 const fse = require('fs-extra');
 //const https = require('https');
 const https = require('follow-redirects').https;
-const __ROOT__ = String(app.getAppPath()).replace(/\/resources\/app/, "");
-const __GAME__ = String(__ROOT__).concat("/resources/html");
+const __ROOT__ = path.dirname(process.execPath);
+const __RES__ = path.resolve(__ROOT__, 'resources');
+const __GAME__ = path.resolve(__ROOT__, 'resources', 'html');
+
 
 app.commandLine.appendSwitch("ignore-gpu-blocklist", true);
 app.commandLine.appendSwitch("enable-gpu-rasterization", true);
@@ -17,27 +20,49 @@ class GameWrapper {
             return 1;
         }
         GameWrapper.initialized = false;
+        GameWrapper.hasGameFiles = false;
         GameWrapper.gamePath = __GAME__;
-        GameWrapper.downloadPath = String(__ROOT__).concat("/resources/archives");
+        GameWrapper.downloadPath = path.resolve(__RES__, 'archives');
         GameWrapper.createdWindow = false;
         GameWrapper.closing = false;
         GameWrapper.callbacks = {};
 
         GameWrapper.sGitOwner = String("armasyll");
-        GameWrapper.sGitRepo = String("psde");
-        GameWrapper.sGitApiPath = String(`/repos/${GameWrapper.sGitOwner}/${GameWrapper.sGitRepo}`);
-        GameWrapper.sGitApiUrn = String("api.github.com").concat(GameWrapper.sGitApiPath);
+        GameWrapper.sGitGameRepo = String("psde");
+        GameWrapper.sGitGameApiPath = String(`/repos/${GameWrapper.sGitOwner}/${GameWrapper.sGitGameRepo}`);
+        GameWrapper.sGitGameApiUrn = String("api.github.com").concat(GameWrapper.sGitGameApiPath);
+        GameWrapper.sGitLauncherRepo = String("psde-e");
+        GameWrapper.sGitLauncherApiPath = String(`/repos/${GameWrapper.sGitOwner}/${GameWrapper.sGitLauncherRepo}`);
+        GameWrapper.sGitLauncherApiUrn = String("api.github.com").concat(GameWrapper.sGitLauncherApiPath);
         GameWrapper.window = null;
         GameWrapper.lastVersion = String("");
         GameWrapper.initialized = true;
+        GameWrapper._launchIntervalID = null;
 
         GameWrapper.parseArguments(process.argv);
 
-        GameWrapper.applyLatestCommit();
-
-        if (!GameWrapper.closing) {
-            app.whenReady().then(GameWrapper.createWindow);
+        if (GameWrapper.closing) {
+            return 0;
         }
+        GameWrapper.hasGameFiles = GameWrapper.testGameDirectory();
+        if (!GameWrapper.hasGameFiles) {
+            GameWrapper.applyLatestGameCommit();
+        }
+        GameWrapper.scheduleLaunch(2000);
+        return 0;
+    }
+
+    static scheduleLaunch(interval = 2000) {
+        GameWrapper._launchIntervalID = setInterval(() => {
+            if (GameWrapper.hasGameFiles) {
+                GameWrapper.unscheduleLaunch();
+                app.whenReady().then(GameWrapper.createWindow);
+            }
+        }, interval);
+        return 0;
+    }
+    static unscheduleLaunch() {
+        clearInterval(GameWrapper._launchIntervalID);
         return 0;
     }
 
@@ -180,7 +205,7 @@ class GameWrapper {
             }
         });
 
-        GameWrapper.window.loadFile(GameWrapper.gamePath.concat("/index.html"));
+        GameWrapper.window.loadFile(path.resolve(GameWrapper.gamePath, "index.html"));
         GameWrapper.window.removeMenu();
         app.on("window-all-closed", GameWrapper.closeWindow);
         app.on("activate", GameWrapper.activateWindow);
@@ -215,6 +240,11 @@ class GameWrapper {
                     GameWrapper.createdWindow = true;
                     break;
                 }
+                case "--update":
+                case "-u": {
+                    GameWrapper.applyLatestGameCommit();
+                    GameWrapper.applyLatestLauncherCommit();
+                }
                 case "-h":
                 case "--help": {
                     console.log("Usage:");
@@ -237,41 +267,39 @@ class GameWrapper {
         return 0;
     }
 
-    static getRepo() {
-        return 0;
-    }
-    static getCommits(per_page = 30, page = 1) {
-        return 0;
-    }
-    static getReleases() {
+    static getGameCommits(per_page = 30, page = 1) {
         return 0;
     }
     static testOnline() {
         return 0;
     }
-    static getRelease(sha = "") {
+    static getLatestGameCommit(parentCallbackID = "") {
+        console.log(`Running GameWrapper.getLatestGameCommit(${parentCallbackID})`);
+        GameWrapper.getGitApiJSON(GameWrapper.sGitGameApiPath.concat("/commits"), GameWrapper.getLatestGameCommitPhaseTwo, GameWrapper.getLatestGameCommitFailed, parentCallbackID);
         return 0;
     }
-    static downloadRelease(sha = "", to = "./") {
-        return 0;
-    }
-    static getCommit(sha = "") {
-        return 0;
-    }
-    static getLatestCommit(parentCallbackID = "") {
-        console.log(`Running GameWrapper.getLatestCommit(${parentCallbackID})`);
-        GameWrapper.getRemoteJSON(GameWrapper.sGitApiPath.concat("/commits"), GameWrapper.getLatestCommitPhaseTwo, GameWrapper.getLatestCommitFailed, parentCallbackID);
-        return 0;
-    }
-    static getLatestCommitPhaseTwo(response, parentCallbackID = "") {
-        console.log(`Running GameWrapper.getLatestCommitPhaseTwo({Object}, ${parentCallbackID})`);
+    static getLatestGameCommitPhaseTwo(response, parentCallbackID = "") {
+        console.log(`Running GameWrapper.getLatestGameCommitPhaseTwo({Object}, ${parentCallbackID})`);
         GameWrapper.runCallback(parentCallbackID, response[0]["sha"]);
         return 0;
     }
-    static getLatestCommitFailed(e) {
+    static getLatestGameCommitFailed(e) {
         return 0;
     }
-    static getRemoteJSON(path = "", callbackSuccess = null, callbackFail = null, parentCallbackID = "") {
+    static getLatestLauncherCommit(parentCallbackID = "") {
+        console.log(`Running GameWrapper.getLatestLauncherCommit(${parentCallbackID})`);
+        GameWrapper.getGitApiJSON(GameWrapper.sGitLauncherApiPath.concat("/commits"), GameWrapper.getLatestLauncherCommitPhaseTwo, GameWrapper.getLatestLauncherCommitFailed, parentCallbackID);
+        return 0;
+    }
+    static getLatestLauncherCommitPhaseTwo(response, parentCallbackID = "") {
+        console.log(`Running GameWrapper.getLatestLauncherCommitPhaseTwo({Object}, ${parentCallbackID})`);
+        GameWrapper.runCallback(parentCallbackID, response[0]["sha"]);
+        return 0;
+    }
+    static getLatestLauncherCommitFailed(e) {
+        return 0;
+    }
+    static getGitApiJSON(path = "", callbackSuccess = null, callbackFail = null, parentCallbackID = "") {
         console.log(`Running GameWrapper.getRemoteJSON(${path}, ${typeof callbackSuccess}, ${typeof callbackFail}, ${parentCallbackID})`);
         let httpOptions = {
             "host": 'api.github.com',
@@ -312,7 +340,6 @@ class GameWrapper {
         return 0;
     }
 
-    static cacheCommit() {}
     static removeGameDirectory(callback = GameWrapper.testGameDirectory) {
         fse.remove(GameWrapper.gamePath)
             .then(callback)
@@ -346,16 +373,23 @@ class GameWrapper {
     static testDownloadDirectory() {
         return fse.existsSync(GameWrapper.downloadPath);
     }
-    static downloadCommit(sha = "", callbackID) {
+    static downloadGameCommit(sha = "", callbackID) {
         sha = String(sha);
         let fileName = sha.concat(".zip");
-        let fileUrl = String(`https://github.com/${GameWrapper.sGitOwner}/${GameWrapper.sGitRepo}/archive/${sha}.zip`);
+        let fileUrl = String(`https://github.com/${GameWrapper.sGitOwner}/${GameWrapper.sGitGameRepo}/archive/${sha}.zip`);
+        GameWrapper.downloadFile(fileUrl, fileName, callbackID);
+        return 0;
+    }
+    static downloadLauncherCommit(sha = "", callbackID) {
+        sha = String(sha);
+        let fileName = sha.concat(".zip");
+        let fileUrl = String(`https://github.com/${GameWrapper.sGitOwner}/${GameWrapper.sGitLauncherRepo}/archive/${sha}.zip`);
         GameWrapper.downloadFile(fileUrl, fileName, callbackID);
         return 0;
     }
     static downloadFile(url, fileName, callbackID) {
-        console.log(`Running GameWrapper.downloadFile(${url}, ${fileName})`)
-        let filePath = GameWrapper.downloadPath.concat("/").concat(fileName);
+        console.log(`Running GameWrapper.downloadFile(${url}, ${fileName})`);
+        let filePath = path.resolve(GameWrapper.downloadPath, fileName);
         if (fse.existsSync(filePath)) {
             GameWrapper.runCallback(callbackID, fileName);
             return 0;
@@ -374,9 +408,9 @@ class GameWrapper {
     static downloadFileFailed(e) {
         return 0;
     }
-    static extractZip(file, dest = __GAME__, parentCallbackID) {
+    static extractZip(file, dest = __RES__, parentCallbackID) {
         try {
-            extract(GameWrapper.downloadPath.concat("/").concat(file), { "dir": dest }, (e) => {
+            extract(path.resolve(GameWrapper.downloadPath, file), { "dir": dest }, (e) => {
                 GameWrapper.runCallback(parentCallbackID, true);
             });
         }
@@ -388,12 +422,13 @@ class GameWrapper {
     static extractZipFailed(e) {
         return 0;
     }
-    static applyCommit(sha, parentCallbackID = "") {
-        console.log(`Running GameWrapper.applyCommit(${sha}, ${parentCallbackID})`);
+    // Game Update
+    static applyGameCommit(sha, parentCallbackID = "") {
+        console.log(`Running GameWrapper.applyGameCommit(${sha}, ${parentCallbackID})`);
         if (!GameWrapper.testDownloadDirectory()) {
             GameWrapper.createDownloadDirectory();
         }
-        GameWrapper.applyCommitPhaseTwo(sha, parentCallbackID);
+        GameWrapper.applyGameCommitPhaseTwo(sha, parentCallbackID);
         return 0;
     }
     /**
@@ -401,21 +436,21 @@ class GameWrapper {
      * @param {string} sha 
      * @param {(string|null)} parentCallbackID 
      */
-    static applyCommitPhaseTwo(sha, parentCallbackID = "") {
-        console.log(`Running GameWrapper.applyCommitPhaseTwo(${sha}, ${parentCallbackID})`);
+    static applyGameCommitPhaseTwo(sha, parentCallbackID = "") {
+        console.log(`Running GameWrapper.applyGameCommitPhaseTwo(${sha}, ${parentCallbackID})`);
         sha = Tools.filterID(sha);
         parentCallbackID = Tools.filterID(parentCallbackID);
         let callbackID = Tools.genUUIDv4();
-        GameWrapper.createCallback(callbackID, parentCallbackID, [sha], GameWrapper.applyCommitPhaseThree);
-        GameWrapper.downloadCommit(sha, callbackID);
+        GameWrapper.createCallback(callbackID, parentCallbackID, [sha], GameWrapper.applyGameCommitPhaseThree);
+        GameWrapper.downloadGameCommit(sha, callbackID);
         return 0;
     }
-    static applyCommitPhaseThree(sha, response, parentCallbackID) {
-        console.log(`Running GameWrapper.applyCommitPhaseThree(${sha}, ${response}, ${parentCallbackID})`);
+    static applyGameCommitPhaseThree(sha, response, parentCallbackID) {
+        console.log(`Running GameWrapper.applyGameCommitPhaseThree(${sha}, ${response}, ${parentCallbackID})`);
         if (GameWrapper.testGameDirectory()) {
             GameWrapper.removeGameDirectory();
         }
-        GameWrapper.applyCommitPhaseFour(sha, response, parentCallbackID);
+        GameWrapper.applyGameCommitPhaseFour(sha, response, parentCallbackID);
         return 0;
     }
     /**
@@ -424,13 +459,13 @@ class GameWrapper {
      * @param {string} response Destination, hopefully.
      * @param {(string|null)} parentCallbackID 
      */
-    static applyCommitPhaseFour(sha, response, parentCallbackID) {
-        console.log(`Running GameWrapper.applyCommitPhaseFour(${sha}, ${response}, ${parentCallbackID})`);
+    static applyGameCommitPhaseFour(sha, response, parentCallbackID) {
+        console.log(`Running GameWrapper.applyGameCommitPhaseFour(${sha}, ${response}, ${parentCallbackID})`);
         sha = Tools.filterID(sha);
         parentCallbackID = Tools.filterID(parentCallbackID);
         let callbackID = Tools.genUUIDv4();
-        GameWrapper.createCallback(callbackID, parentCallbackID, [sha, response], GameWrapper.applyCommitPhaseFive);
-        GameWrapper.extractZip(response, __ROOT__.concat("/resources"), callbackID);
+        GameWrapper.createCallback(callbackID, parentCallbackID, [sha, response], GameWrapper.applyGameCommitPhaseFive);
+        GameWrapper.extractZip(response, __RES__, callbackID);
         return 0;
     }
     /**
@@ -440,16 +475,83 @@ class GameWrapper {
      * @param {boolean} response 
      * @param {string} parentCallbackID 
      */
-    static applyCommitPhaseFive(sha, dest, response, parentCallbackID) {
-        console.log(`Running GameWrapper.applyCommitPhaseFive()`);
-        let sFrom = __ROOT__.concat("/resources/").concat(GameWrapper.sGitRepo).concat("-").concat(sha);
+    static applyGameCommitPhaseFive(sha, dest, response, parentCallbackID) {
+        console.log(`Running GameWrapper.applyGameCommitPhaseFive()`);
+        let sFrom = path.resolve(__RES__, GameWrapper.sGitGameRepo.concat("-").concat(sha));
         fse.moveSync(sFrom, GameWrapper.gamePath);
+        GameWrapper.hasGameFiles = GameWrapper.testGameDirectory();
         return 0;
     }
-    static applyLatestCommit() {
+    static applyLatestGameCommit() {
         let callbackID = Tools.genUUIDv4();
-        GameWrapper.createCallback(callbackID, null, null, GameWrapper.applyCommit);
-        GameWrapper.getLatestCommit(callbackID);
+        GameWrapper.createCallback(callbackID, null, null, GameWrapper.applyGameCommit);
+        GameWrapper.getLatestGameCommit(callbackID);
+        return 0;
+    }
+    // Launcher Update
+    static applyLauncherCommit(sha, parentCallbackID = "") {
+        console.log(`Running GameWrapper.applyLauncherCommit(${sha}, ${parentCallbackID})`);
+        if (!GameWrapper.testDownloadDirectory()) {
+            GameWrapper.createDownloadDirectory();
+        }
+        GameWrapper.applyLauncherCommitPhaseTwo(sha, parentCallbackID);
+        return 0;
+    }
+    /**
+     * Creates download and game directories, downloads commit, and extracts commit
+     * @param {string} sha 
+     * @param {(string|null)} parentCallbackID 
+     */
+    static applyLauncherCommitPhaseTwo(sha, parentCallbackID = "") {
+        console.log(`Running GameWrapper.applyLauncherCommitPhaseTwo(${sha}, ${parentCallbackID})`);
+        sha = Tools.filterID(sha);
+        parentCallbackID = Tools.filterID(parentCallbackID);
+        let callbackID = Tools.genUUIDv4();
+        GameWrapper.createCallback(callbackID, parentCallbackID, [sha], GameWrapper.applyLauncherCommitPhaseThree);
+        GameWrapper.downloadLauncherCommit(sha, callbackID);
+        return 0;
+    }
+    static applyLauncherCommitPhaseThree(sha, response, parentCallbackID) {
+        console.log(`Running GameWrapper.applyLauncherCommitPhaseThree(${sha}, ${response}, ${parentCallbackID})`);
+        if (GameWrapper.testGameDirectory()) {
+            GameWrapper.removeGameDirectory();
+        }
+        GameWrapper.applyLauncherCommitPhaseFour(sha, response, parentCallbackID);
+        return 0;
+    }
+    /**
+     * 
+     * @param {string} sha 
+     * @param {string} response Destination, hopefully.
+     * @param {(string|null)} parentCallbackID 
+     */
+    static applyLauncherCommitPhaseFour(sha, response, parentCallbackID) {
+        console.log(`Running GameWrapper.applyLauncherCommitPhaseFour(${sha}, ${response}, ${parentCallbackID})`);
+        sha = Tools.filterID(sha);
+        parentCallbackID = Tools.filterID(parentCallbackID);
+        let callbackID = Tools.genUUIDv4();
+        GameWrapper.createCallback(callbackID, parentCallbackID, [sha, response], GameWrapper.applyLauncherCommitPhaseFive);
+        GameWrapper.extractZip(response, __RES__, callbackID);
+        return 0;
+    }
+    /**
+     * Move files where they need to go
+     * @param {string} sha 
+     * @param {string} dest 
+     * @param {boolean} response 
+     * @param {string} parentCallbackID 
+     */
+    static applyLauncherCommitPhaseFive(sha, dest, response, parentCallbackID) {
+        console.log(`Running GameWrapper.applyLauncherCommitPhaseFive()`);
+        let sFrom = path.resolve(__RES__, GameWrapper.sGitGameRepo.concat("-").concat(sha));
+        // move index file 'cause that's all i think i'll ever be using :D - 2021-03-12 02:08
+        fse.moveSync(path.resolve(sFrom, "index.js"), path.resolve(__RES__, "app", "index.js"));
+        return 0;
+    }
+    static applyLatestLauncherCommit() {
+        let callbackID = Tools.genUUIDv4();
+        GameWrapper.createCallback(callbackID, null, null, GameWrapper.applyLauncherCommit);
+        GameWrapper.getLatestLauncherCommit(callbackID);
         return 0;
     }
 }
