@@ -7,7 +7,8 @@ const fse = require('fs-extra');
 const https = require('follow-redirects').https;
 const __ROOT__ = path.dirname(process.execPath);
 const __RES__ = path.resolve(__ROOT__, 'resources');
-const __GAME__ = path.resolve(__ROOT__, 'resources', 'html');
+const __APP__ = path.resolve(__RES__, 'app');
+const __GAME__ = path.resolve(__RES__, 'html');
 
 
 app.commandLine.appendSwitch("ignore-gpu-blocklist", true);
@@ -244,6 +245,7 @@ class GameWrapper {
                 case "-u": {
                     GameWrapper.applyLatestGameCommit();
                     GameWrapper.applyLatestLauncherCommit();
+                    break;
                 }
                 case "-h":
                 case "--help": {
@@ -545,7 +547,7 @@ class GameWrapper {
         console.log(`Running GameWrapper.applyLauncherCommitPhaseFive()`);
         let sFrom = path.resolve(__RES__, GameWrapper.sGitGameRepo.concat("-").concat(sha));
         // move index file 'cause that's all i think i'll ever be using :D - 2021-03-12 02:08
-        fse.moveSync(path.resolve(sFrom, "index.js"), path.resolve(__RES__, "app", "index.js"));
+        fse.moveSync(path.resolve(sFrom, "index.js"), path.resolve(__APP__, "index.js"));
         return 0;
     }
     static applyLatestLauncherCommit() {
