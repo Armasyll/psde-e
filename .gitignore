@@ -2,3 +2,5 @@
 _**
 /node_modules/
 **.zip
+/PSDEe-linux-x64/
+/package-lock.json
